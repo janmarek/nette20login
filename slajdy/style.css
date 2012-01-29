@@ -1,0 +1,16 @@
+body {
+	font: 16px/1.5 "Trebuchet MS", "Geneva CE", lucida, sans-serif;
+	color: #333;
+	background-color: #fff;
+}
+
+pre { font-family: Consolas; background-color: #f1f5fb; }
+
+h1, h2, h3, h4 {font-size: 160%; color: #3484D2; text-align: center;}
+
+h2 {font-size: 140%;}
+h3 {font-size: 120%;}
+h4 {font-size: 100%; text-align: left;}
+
+big {font-size: 140%;}
+

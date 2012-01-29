@@ -1,0 +1,264 @@
+Přihlašování uživatelů v Nette Frameworku 2.0
+###############
+
+.<>
+<big>Jan Marek
+ "@HonzaMarek":twitter.com/HonzaMarek</big>
+
+Přihlašování uživatelů v aplikaci
+#################################
+
+* Použití pouze hesla je zastaralé
+* Registrace a nutnost pamatování si hesla je obtěžující
+* Kliknutí na tlačítko s přihlášením přes Facebook nebo Twitter je pro uživatele jednoduché
+
+Ukázková aplikace
+=================
+
+.<>
+[* app.png *]
+
+Přihlašování formulářem
+###########
+
+/--code
+$values = $form->getValues();
+
+/* @var \Nette\Security\User $user */
+$user = $presenter->getUser();
+
+$user->login($values->username, $values->password);
+// na pozadí volá službu authenticator
+
+// Zjistíme, zda je uživatel přihlášen
+if ($user->isLoggedIn()) {
+	echo 'přihlášen ' . $user->getIdentity()->name;
+} else {
+	echo 'nepřihlášen';
+}
+
+// A odhlásíme jej
+$user->logout();
+\--
+
+Pro zprovoznění je potřeba: .<
+--------------------------
+
+**config.neon**
+
+/--code
+services:
+	authenticator: PasswordAuthenticator
+\--
+
+Třída **PasswordAuthenticator** implementující **Nette\Security\IAuthenticator**
+
+Přihlašování formulářem podrobněji
+####################
+.<>
+[* user.png *]
+
+Co je potřeba pro přihlášení na Facebooku
+########
+
+1) Vyrobit si developer account
+   - adresa (todo)
+   - zadat telefonní číslo a počkat třeba týden až mi na něj přijde heslo
+2) Vytvořit aplikaci na https://developers.facebook.com/apps
+   - zaškrtnout Website
+   - nastavení domény (třeba localhost)
+3) Stáhnout si https://github.com/facebook/php-sdk
+
+Jak funguje přihlášení přes Facebook
+#################################
+
+/--code
+$facebook = new Facebook(array('appId' => $appId, 'secret' => $secret));
+
+$fbLoginUrl = $facebook->getLoginUrl(array(
+	// speciální práva
+	'scope' => 'email',
+	// kam se vrátit po autentifikaci na FB
+	'redirect_uri' => $this->link('//fbLogin'), // absolute
+));
+
+// ---- facebook přesměruje zpět na náš web ----
+\--
+
+Konfigurace v Nette .<
+-----------
+
+/--code
+parameters:
+	facebook:
+		appId: '123454656575' # musi byt string
+		secret: e431eabeceda01ecb904f05a0bb21a
+
+services:
+	database: @Nette\Database\Connection
+
+	userModel: UserModel
+
+	facebook: Facebook( {appId: %facebook.appId%, secret: %facebook.secret%} )
+
+	facebookAuthenticator: FacebookAuthenticator
+\--
+
+Po přesměrování z Facebooku
+###################
+
+presenter .<
+---------
+
+1) Zjistím informace o přihlášeném uživateli
+2) Předám ke zpracování FacebookAuthenticatoru
+
+/--code
+$info = $facebook->api('/me');
+
+// najít příslušnout identitu
+$identity = $facebookAuthenticator->authenticate($info);
+\--
+
+Api /me vrací .<
+--------------
+
+/--code
+array(12) {
+   id => "1305711413" (10)
+   name => "Honza Marek" (11)
+   first_name => "Honza" (5)
+   last_name => "Marek" (5)
+   link => "http://www.facebook.com/honzamarek88" (36)
+   username => "honzamarek88" (12)
+   gender => "male" (4)
+   email => "honzamarekhonza@gmail.com" (25)
+   timezone => 1
+   locale => "en_US" (5)
+   verified => TRUE
+   updated_time => "2012-01-27T21:51:20+0000" (24)
+}
+\--
+
+FacebookAuthenticator
+#######################
+
+**Umí přihlásit i uživatele, který se u nás neregistroval.**
+
+1) Podívám se, jestli uživatele znám (podle e-mailu)
+2) Pokud znám, ale dosud nemá nastavené FB UID, nastavím
+3) Pokud neznám, v tichosti jej vytvořím
+
+Vrácenout identitu presenter zaloguje do usera .<
+--------------
+
+/--code
+$identity = $facebookAuthenticator->authenticate($info);
+$this->getUser()->login($identity);
+\--
+
+Twitter
+#######
+
+* Vytvoření aplikace na https://dev.twitter.com/apps
+* Twitter neprozrazuje mail uživatelů (takže podle něj nelze párovat s ostatníma způsobama přihlášení)
+* Nelze zaregistrovat aplikaci na adrese http://localhost/, je potřeba si vytvořit virtualhost
+
+
+Twitter
+######
+
+1) Vytvoří se dočasný autorizační token
+
+/--code
+$twitter = new TwitterOAuth($consumerKey, $consumerSecret);
+$token = $twitter->getRequestToken();
+\--
+
+2) Ten si uložíme do session, protože ho budeme později potřebovat
+/--code
+$twitterSession = $this->getSession('twitter');
+$twitterSession->oauthToken = $token['oauth_token'];
+$twitterSession->oauthTokenSecret = $token['oauth_token_secret'];
+\--
+
+3) Vygenerujeme adresu pro autentifikaci na Twitteru
+/--code
+$twitterUrl = $twitter->getAuthorizeURL($token);
+\---
+
+Adresa pro přesměrování je specifikována už při vytváření twitter aplikace.
+
+Po přesměrování zpět z twitteru
+######
+
+1) Vytvořím "přihlášenou instanci" třídy TwitterOAuth
+
+/--code
+$twitter = new TwitterOAuth(
+	$consumerKey,
+	$consumerSecret,
+	$twitterSession->oauthToken,
+	$twitterSession->oauthTokenSecret
+);
+\--
+
+2) Z metody getAccessToken dokážu zjistit id a twitter jméno uživatele
+3) Na základě toho můžu požádat o podrobnější informace
+
+/--code
+$accessToken = $twitter->getAccessToken();
+$info = $twitter->get('/users/show', array(
+	'user_id' => $accessToken['user_id'],
+));
+\--
+
+4) TwitterAuthenticator funguje podobně jako FacebookAuthenticator
+/--code
+$identity = $twitterAuthenticator->authenticate($info);
+$this->getUser()->login($identity);
+\--
+
+getAccessToken .<
+----------------
+
+/--code
+array(4) {
+   oauth_token => "15968205-aMB1aTj4rBtFBHB2r1Pz8nIAOgQz1KlXehlk3PIw" (49)
+   oauth_token_secret => "XaCUlWkmXqAwFck6WpwatxaHjTYR8pYAL5bfwbz97A" (42)
+   user_id => "15968205" (8)
+   screen_name => "HonzaMarek" (10)
+}
+\--
+
+Nette konfigurace
+########
+
+/--code
+parameters:
+	twitter:
+		consumerKey: xj7fvacBq1TteFegFaFMig
+		consumerSecret: e3JUpsy56vajecDgeVZoVWCOu7eqw4gstyYvTOe91lI
+
+services:
+	database: @Nette\Database\Connection
+
+	userModel: UserModel
+
+	twitter: TwitterOAuth( %twitter.consumerKey%, %twitter.consumerSecret% )
+
+	twitterAuthenticator: TwitterAuthenticator
+\--
+
+Odkazy
+######
+
+* Tento příklad na githubu: https://github.com/janmarek/nette20login (za chvíli to tam bude)
+
+* Nette: http://doc.nette.org/cs/security
+* Facebook: https://developers.facebook.com/
+* Registrace FB aplikace: https://developers.facebook.com/apps
+* Twitter: https://dev.twitter.com/
+* Registrace Twitter aplikace: https://dev.twitter.com/apps
+* Twitter OAuth knihovna: https://github.com/abraham/twitteroauth
+* Twitter česky: http://www.phpguru.cz/clanky/prihlasovani-twitter-oauth

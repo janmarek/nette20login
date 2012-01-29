@@ -1,0 +1,27 @@
+{block content}
+
+{if isset($identity)}
+
+<p>Uživatel <strong n:ifset="$identity->name">{$identity->name}</strong> přihlášen</p>
+
+<p n:ifset="$identity->twitter">
+	Twitter:
+	<a href="http://twitter.com/{$identity->twitter}">
+		<img src="http://api.twitter.com/1/users/profile_image/{$identity->twitter}.png" style="vertical-align: middle">
+	</a>
+</p>
+
+<p n:ifset="$identity->fbuid">
+	Facebook:
+	<a href="http://www.facebook.com/{$identity->fbuid}">
+		<img src="http://graph.facebook.com/{$identity->fbuid}/picture" style="vertical-align: middle">
+	</a>
+</p>
+
+<p><a n:href="Sign:out">Odhlásit se</a></p>
+
+{else}
+
+<p><a n:href="Sign:in">Přihlašte se</a></p>
+
+{/if}

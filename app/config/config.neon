@@ -1,0 +1,55 @@
+#
+# SECURITY WARNING: it is CRITICAL that this file & directory are NOT accessible directly via a web browser!
+#
+# If you don't protect this directory from direct web access, anybody will be able to see your passwords.
+# http://nette.org/security-warning
+#
+common:
+	parameters:
+		database:
+			driver: mysql
+			host: localhost
+			dbname: login
+			user: root
+			password: xxx
+		facebook:
+			appId: '12345' # musi byt string
+			secret: 'yourappsecret'
+		twitter:
+			consumerKey: 'yourconsumerkey'
+			consumerSecret: 'yourconsumersecret'
+
+	php:
+		date.timezone: Europe/Prague
+		# session.save_path: "%tempDir%/sessions"
+		# zlib.output_compression: yes
+
+	nette:
+		database:
+			default:
+				dsn: '%database.driver%:host=%database.host%;dbname=%database.dbname%'
+				user: %database.user%
+				password: %database.password%
+		container:
+			debugger: true
+
+	services:
+		database: @Nette\Database\Connection
+
+		userModel: UserModel
+
+		authenticator: PasswordAuthenticator
+
+		facebook: Facebook( {appId: %facebook.appId%, secret: %facebook.secret%} )
+
+		facebookAuthenticator: FacebookAuthenticator
+
+		twitter: TwitterOAuth( %twitter.consumerKey%, %twitter.consumerSecret% )
+
+		twitterAuthenticator: TwitterAuthenticator
+
+	factories:
+
+production < common:
+
+development < common:
