@@ -46,7 +46,7 @@ class FacebookAuthenticator
 		}
 
 		if (empty($user['fbuid'])) {
-			$updateData['name'] = $me['id'];
+			$updateData['fbuid'] = $me['id'];
 		}
 
 		if (!empty($updateData)) {
